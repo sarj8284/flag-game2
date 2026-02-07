@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0f172a">
+<meta name="mobile-web-app-capable" content="yes">
+<title>국기 사천성</title>
+<link rel="manifest" href="data:application/json;base64,##MANIFEST##">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { width:100%; height:100%; overflow-x:hidden; }
+  body {
+    font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+    min-height: 100vh; min-height: 100dvh;
+    color: #e2e8f0;
+    touch-action: manipulation;
+  }
+  button { font-family: inherit; }
+
+  .container { max-width: 580px; margin: 0 auto; padding: 8px; }
+
+  /* 최고기록 */
+  .records { background: linear-gradient(135deg, rgba(251,191,36,0.15), rgba(245,158,11,0.1)); border-radius:12px; padding:10px 14px; margin-bottom:8px; border:1px solid rgba(251,191,36,0.3); }
+  .records h2 { font-size:13px; font-weight:700; text-align:center; color:#fbbf24; margin-bottom:8px; }
+  .record-row { display:flex; align-items:center; justify-content:space-between; background:rgba(255,255,255,0.05); border-radius:6px; padding:4px 10px; font-size:11px; margin-bottom:3px; }
+  .record-row .date { color:#94a3b8; }
+  .record-row .time-val { font-weight:700; color:#4ade80; margin-right:8px; }
+  .record-row .moves-val { color:#64748b; }
+
+  /* 헤더 */
+  .header { background:rgba(255,255,255,0.05); border-radius:14px; padding:12px; margin-bottom:8px; border:1px solid rgba(255,255,255,0.08); }
+  .title { font-size:22px; font-weight:800; text-align:center; background:linear-gradient(135deg,#60a5fa,#a78bfa,#f472b6); -webkit-background-clip:text; -webkit-text-fill-color:transparent; margin-bottom:10px; letter-spacing:-0.5px; }
+  .stats { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; text-align:center; }
+  .stat { border-radius:10px; padding:6px; }
+  .stat-label { font-size:10px; color:#94a3b8; margin-bottom:2px; }
+  .stat-value { font-size:18px; font-weight:800; }
+  .stat-score { background:rgba(96,165,250,0.12); }
+  .stat-score .stat-value { color:#60a5fa; }
+  .stat-moves { background:rgba(167,139,250,0.12); }
+  .stat-moves .stat-value { color:#a78bfa; }
+  .stat-time { background:rgba(52,211,153,0.12); }
+  .stat-time .stat-value { color:#34d399; }
+
+  /* 게임판 */
+  .board-wrap { background:rgba(255,255,255,0.04); border-radius:14px; padding:4px; margin-bottom:8px; position:relative; overflow:visible; border:1px solid rgba(255,255,255,0.06); }
+  .board { display:grid; grid-template-columns:repeat(10,1fr); gap:2px; position:relative; }
+  .tile {
+    aspect-ratio:1; border-radius:5px; display:flex; align-items:center; justify-content:center;
+    border:1px solid rgba(255,255,255,0.08); background:rgba(255,255,255,0.06);
+    cursor:pointer; transition: transform 0.15s, box-shadow 0.15s, opacity 0.3s, border-color 0.15s;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05);
+    padding:0; outline:none; position:relative; overflow:hidden;
+    -webkit-user-select:none; user-select:none;
+  }
+  .tile span { font-size: clamp(18px, 4vw, 30px); line-height:1; pointer-events:none; }
+  .tile.matched { opacity:0; pointer-events:none; cursor:default; }
+  .tile.selected { border:2px solid #fbbf24; background:rgba(251,191,36,0.15); box-shadow:0 0 12px rgba(251,191,36,0.5); transform:scale(1.08); }
+  .tile.hinted { border:2px solid #60a5fa; background:rgba(96,165,250,0.15); box-shadow:0 0 16px rgba(96,165,250,0.6); transform:scale(1.08); animation: hintPulse 1s ease-in-out infinite; }
+  .tile.exploding { transform:scale(1.2); box-shadow:0 0 20px rgba(251,191,36,0.8); }
+  .tile.exploding span { filter:brightness(1.5); }
+
+  /* 버튼 */
+  .buttons { display:flex; gap:6px; margin-bottom:8px; }
+  .btn { flex:1; display:flex; align-items:center; justify-content:center; gap:5px; font-weight:700; font-size:12px; padding:10px 4px; border-radius:10px; border:none; cursor:pointer; color:#fff; }
+  .btn-new { background:linear-gradient(135deg,#3b82f6,#2563eb); box-shadow:0 4px 12px rgba(59,130,246,0.4); }
+  .btn-shuffle { background:linear-gradient(135deg,#8b5cf6,#7c3aed); box-shadow:0 4px 12px rgba(139,92,246,0.4); }
+  .btn-hint { background:linear-gradient(135deg,#06b6d4,#0891b2); box-shadow:0 4px 12px rgba(6,182,212,0.4); }
+  .btn:disabled { background:rgba(255,255,255,0.08)!important; color:#64748b!important; cursor:not-allowed; box-shadow:none!important; }
+
+  /* 승리 모달 */
+  .overlay { position:fixed; inset:0; background:rgba(0,0,0,0.7); display:flex; align-items:center; justify-content:center; z-index:50; backdrop-filter:blur(8px); }
+  .modal { background:linear-gradient(135deg,#1e293b,#334155); border-radius:20px; padding:32px; max-width:340px; margin:0 16px; text-align:center; border:1px solid rgba(251,191,36,0.3); box-shadow:0 25px 60px rgba(0,0,0,0.5); }
+  .modal h2 { font-size:24px; font-weight:800; color:#f8fafc; margin-bottom:8px; }
+  .modal .new-record { font-size:16px; font-weight:700; color:#fbbf24; margin-bottom:8px; }
+  .modal .final-info { color:#94a3b8; margin-bottom:12px; font-size:14px; }
+  .modal .final-score { font-size:22px; font-weight:800; color:#60a5fa; margin-bottom:20px; }
+
+  /* 게임설명 */
+  .info { background:rgba(255,255,255,0.04); border-radius:12px; padding:10px 14px; border:1px solid rgba(255,255,255,0.06); }
+  .info h3 { font-weight:700; color:#cbd5e1; margin-bottom:6px; font-size:12px; }
+  .info div { font-size:10px; color:#64748b; line-height:1.7; }
+
+  /* SVG 경로 */
+  .path-svg { position:absolute; top:0; left:0; width:100%; height:100%; overflow:visible; pointer-events:none; }
+
+  @keyframes hintPulse { 0%,100%{opacity:1} 50%{opacity:0.6} }
+  @keyframes drawLine { to{stroke-dashoffset:0} }
+
+  /* SVG 아이콘 인라인 */
+  .icon { width:14px; height:14px; display:inline-block; vertical-align:middle; }
+  .icon-trophy { width:48px; height:48px; margin:0 auto 12px; color:#fbbf24; display:block; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+// Inline manifest for PWA
+(function(){
+  const manifest = {
+    name: "국기 사천성",
+    short_name: "국기사천성",
+    description: "국기를 매칭하는 사천성 퍼즐 게임",
+    start_url: ".",
+    display: "standalone",
+    orientation: "portrait",
+    background_color: "#0f172a",
+    theme_color: "#0f172a",
+    icons: [{
+      src: "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="80" fill="#0f172a"/><text x="256" y="340" font-size="280" text-anchor="middle">🌍</text></svg>'),
+      sizes: "512x512",
+      type: "image/svg+xml",
+      purpose: "any maskable"
+    }]
+  };
+  const blob = new Blob([JSON.stringify(manifest)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('link');
+  link.rel = 'manifest';
+  link.href = url;
+  document.head.appendChild(link);
+  // Remove placeholder
+  const old = document.querySelector('link[href^="data:application/json;base64"]');
+  if(old) old.remove();
+})();
+
+// Register a minimal inline service worker for offline support
+if ('serviceWorker' in navigator) {
+  const swCode = `
+    const CACHE = 'flag-shisen-v1';
+    self.addEventListener('install', e => {
+      e.waitUntil(caches.open(CACHE).then(c => c.addAll(['./', './index.html'])).then(() => self.skipWaiting()));
+    });
+    self.addEventListener('activate', e => {
+      e.waitUntil(self.clients.claim());
+    });
+    self.addEventListener('fetch', e => {
+      e.respondWith(caches.match(e.request).then(r => r || fetch(e.request).catch(() => caches.match('./'))));
+    });
+  `;
+  const blob = new Blob([swCode], {type: 'application/javascript'});
+  navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(()=>{});
+}
+</script>
+
+<script>
+// ===== Minimal React-like framework (no dependencies) =====
+const App = (function() {
+  const FLAGS = [
+    {code:'kr',name:'대한민국',emoji:'🇰🇷'},{code:'jp',name:'일본',emoji:'🇯🇵'},
+    {code:'cn',name:'중국',emoji:'🇨🇳'},{code:'us',name:'미국',emoji:'🇺🇸'},
+    {code:'gb',name:'영국',emoji:'🇬🇧'},{code:'fr',name:'프랑스',emoji:'🇫🇷'},
+    {code:'de',name:'독일',emoji:'🇩🇪'},{code:'it',name:'이탈리아',emoji:'🇮🇹'},
+    {code:'es',name:'스페인',emoji:'🇪🇸'},{code:'br',name:'브라질',emoji:'🇧🇷'},
+    {code:'ca',name:'캐나다',emoji:'🇨🇦'},{code:'au',name:'호주',emoji:'🇦🇺'},
+    {code:'ru',name:'러시아',emoji:'🇷🇺'},{code:'in',name:'인도',emoji:'🇮🇳'},
+    {code:'mx',name:'멕시코',emoji:'🇲🇽'},{code:'ar',name:'아르헨티나',emoji:'🇦🇷'},
+    {code:'za',name:'남아공',emoji:'🇿🇦'},{code:'eg',name:'이집트',emoji:'🇪🇬'},
+    {code:'nl',name:'네덜란드',emoji:'🇳🇱'},{code:'se',name:'스웨덴',emoji:'🇸🇪'},
+    {code:'no',name:'노르웨이',emoji:'🇳🇴'},{code:'ch',name:'스위스',emoji:'🇨🇭'},
+    {code:'at',name:'오스트리아',emoji:'🇦🇹'},{code:'be',name:'벨기에',emoji:'🇧🇪'},
+    {code:'pl',name:'폴란드',emoji:'🇵🇱'},{code:'gr',name:'그리스',emoji:'🇬🇷'},
+    {code:'pt',name:'포르투갈',emoji:'🇵🇹'},{code:'tr',name:'터키',emoji:'🇹🇷'},
+    {code:'th',name:'태국',emoji:'🇹🇭'},{code:'vn',name:'베트남',emoji:'🇻🇳'},
+    {code:'id',name:'인도네시아',emoji:'🇮🇩'},{code:'sa',name:'사우디',emoji:'🇸🇦'},
+    {code:'ae',name:'UAE',emoji:'🇦🇪'},{code:'il',name:'이스라엘',emoji:'🇮🇱'},
+    {code:'sg',name:'싱가포르',emoji:'🇸🇬'},{code:'my',name:'말레이시아',emoji:'🇲🇾'},
+    {code:'ph',name:'필리핀',emoji:'🇵🇭'},{code:'nz',name:'뉴질랜드',emoji:'🇳🇿'},
+    {code:'fi',name:'핀란드',emoji:'🇫🇮'},{code:'dk',name:'덴마크',emoji:'🇩🇰'},
+    {code:'ie',name:'아일랜드',emoji:'🇮🇪'},{code:'cz',name:'체코',emoji:'🇨🇿'},
+    {code:'hu',name:'헝가리',emoji:'🇭🇺'},{code:'ro',name:'루마니아',emoji:'🇷🇴'},
+    {code:'ua',name:'우크라이나',emoji:'🇺🇦'},{code:'cl',name:'칠레',emoji:'🇨🇱'},
+    {code:'co',name:'콜롬비아',emoji:'🇨🇴'},{code:'pe',name:'페루',emoji:'🇵🇪'},
+    {code:'ng',name:'나이지리아',emoji:'🇳🇬'},{code:'ke',name:'케냐',emoji:'🇰🇪'},
+  ];
+
+  const ROWS = 10, COLS = 10;
+
+  let state = {
+    board: [],
+    selected: null,
+    matched: new Set(),
+    score: 0,
+    moves: 0,
+    time: 0,
+    isPlaying: false,
+    gameWon: false,
+    animatingPath: null,
+    exploding: new Set(),
+    hintsRemaining: 2,
+    hintPair: null,
+    shufflesRemaining: 1,
+    bestTimes: []
+  };
+
+  let timerInterval = null;
+
+  function setState(updates) {
+    Object.assign(state, updates);
+    render();
+  }
+
+  // ===== Game Logic =====
+  function isPathClearWith(pos1, pos2, matchedSet) {
+    if (pos1.row === pos2.row) {
+      const min = Math.min(pos1.col, pos2.col), max = Math.max(pos1.col, pos2.col);
+      for (let c = min+1; c < max; c++) { if (!matchedSet.has(pos1.row*COLS+c)) return false; }
+      return true;
+    }
+    if (pos1.col === pos2.col) {
+      const min = Math.min(pos1.row, pos2.row), max = Math.max(pos1.row, pos2.row);
+      for (let r = min+1; r < max; r++) { if (!matchedSet.has(r*COLS+pos1.col)) return false; }
+      return true;
+    }
+    return false;
+  }
+
+  function canReachEdgeWith(pos, edge, matchedSet) {
+    if (edge==='top') { for(let r=0;r<pos.row;r++) if(!matchedSet.has(r*COLS+pos.col)) return false; return true; }
+    if (edge==='bottom') { for(let r=pos.row+1;r<ROWS;r++) if(!matchedSet.has(r*COLS+pos.col)) return false; return true; }
+    if (edge==='left') { for(let c=0;c<pos.col;c++) if(!matchedSet.has(pos.row*COLS+c)) return false; return true; }
+    if (edge==='right') { for(let c=pos.col+1;c<COLS;c++) if(!matchedSet.has(pos.row*COLS+c)) return false; return true; }
+    return false;
+  }
+
+  function findPathWith(idx1, idx2, matchedSet) {
+    if (idx1===idx2) return null;
+    const p1={row:Math.floor(idx1/COLS),col:idx1%COLS}, p2={row:Math.floor(idx2/COLS),col:idx2%COLS};
+
+    // straight
+    if (isPathClearWith(p1,p2,matchedSet)) return [p1,p2];
+
+    // one corner
+    const c1={row:p1.row,col:p2.col}, c2={row:p2.row,col:p1.col};
+    if (matchedSet.has(c1.row*COLS+c1.col) && isPathClearWith(p1,c1,matchedSet) && isPathClearWith(c1,p2,matchedSet)) return [p1,c1,p2];
+    if (matchedSet.has(c2.row*COLS+c2.col) && isPathClearWith(p1,c2,matchedSet) && isPathClearWith(c2,p2,matchedSet)) return [p1,c2,p2];
+
+    // two corners - horizontal scan
+    for (let col=0;col<COLS;col++) {
+      if(col===p1.col||col===p2.col) continue;
+      const m1={row:p1.row,col}, m2={row:p2.row,col};
+      if(matchedSet.has(m1.row*COLS+m1.col)&&matchedSet.has(m2.row*COLS+m2.col)&&isPathClearWith(p1,m1,matchedSet)&&isPathClearWith(m1,m2,matchedSet)&&isPathClearWith(m2,p2,matchedSet))
+        return [p1,m1,m2,p2];
+    }
+    // two corners - vertical scan
+    for (let row=0;row<ROWS;row++) {
+      if(row===p1.row||row===p2.row) continue;
+      const m1={row,col:p1.col}, m2={row,col:p2.col};
+      if(matchedSet.has(m1.row*COLS+m1.col)&&matchedSet.has(m2.row*COLS+m2.col)&&isPathClearWith(p1,m1,matchedSet)&&isPathClearWith(m1,m2,matchedSet)&&isPathClearWith(m2,p2,matchedSet))
+        return [p1,m1,m2,p2];
+    }
+
+    // edges
+    const edges = [
+      ['top', {row:-1,col:p1.col}, {row:-1,col:p2.col}],
+      ['bottom', {row:ROWS,col:p1.col}, {row:ROWS,col:p2.col}],
+      ['left', {row:p1.row,col:-1}, {row:p2.row,col:-1}],
+      ['right', {row:p1.row,col:COLS}, {row:p2.row,col:COLS}],
+    ];
+    for (const [edge,e1,e2] of edges) {
+      if (canReachEdgeWith(p1,edge,matchedSet) && canReachEdgeWith(p2,edge,matchedSet))
+        return [p1,e1,e2,p2];
+    }
+
+    return null;
+  }
+
+  function hasValidMoves(board, matchedSet) {
+    for (let i=0;i<board.length;i++) {
+      if(matchedSet.has(i)) continue;
+      for (let j=i+1;j<board.length;j++) {
+        if(matchedSet.has(j)) continue;
+        if(board[i].code===board[j].code && findPathWith(i,j,matchedSet)) return true;
+      }
+    }
+    return false;
+  }
+
+  function shuffleArray(arr) {
+    for (let i=arr.length-1;i>0;i--) { const j=Math.floor(Math.random()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]]; }
+    return arr;
+  }
+
+  function initializeGame() {
+    clearInterval(timerInterval);
+    const pairsNeeded = (ROWS*COLS)/2;
+    const selectedFlags = FLAGS.slice(0, pairsNeeded);
+    let tiles, attempts=0;
+    while(attempts<50) {
+      tiles = [];
+      selectedFlags.forEach((f,i) => { tiles.push({id:i*2,...f}); tiles.push({id:i*2+1,...f}); });
+      shuffleArray(tiles);
+      if(hasValidMoves(tiles,new Set())) break;
+      attempts++;
+    }
+    state.board = tiles;
+    state.selected = null;
+    state.matched = new Set();
+    state.score = 0;
+    state.moves = 0;
+    state.time = 0;
+    state.isPlaying = true;
+    state.gameWon = false;
+    state.animatingPath = null;
+    state.exploding = new Set();
+    state.hintsRemaining = 2;
+    state.hintPair = null;
+    state.shufflesRemaining = 1;
+    startTimer();
+    render();
+  }
+
+  function startTimer() {
+    clearInterval(timerInterval);
+    timerInterval = setInterval(() => {
+      if(state.isPlaying && !state.gameWon) {
+        state.time++;
+        updateTimerDisplay();
+      }
+    }, 1000);
+  }
+
+  function updateTimerDisplay() {
+    const el = document.getElementById('timer-display');
+    if(el) el.textContent = formatTime(state.time);
+  }
+
+  function formatTime(s) { return Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); }
+
+  function playClap() {
+    try {
+      const ctx = new (window.AudioContext||window.webkitAudioContext)();
+      const mk = (t) => {
+        const bs = ctx.sampleRate*0.05, buf = ctx.createBuffer(1,bs,ctx.sampleRate), d = buf.getChannelData(0);
+        for(let i=0;i<bs;i++) d[i]=(Math.random()*2-1)*Math.exp(-i/(bs*0.3));
+        const n=ctx.createBufferSource(); n.buffer=buf;
+        const f=ctx.createBiquadFilter(); f.type='highpass'; f.frequency.value=1000;
+        const g=ctx.createGain(); g.gain.setValueAtTime(0.3,t); g.gain.exponentialRampToValueAtTime(0.01,t+0.05);
+        n.connect(f); f.connect(g); g.connect(ctx.destination); n.start(t); n.stop(t+0.05);
+      };
+      const now=ctx.currentTime; mk(now); mk(now+0.06);
+    } catch(e){}
+  }
+
+  function saveBestTime(time, moves, score) {
+    const rec = { time, moves, score, date: new Date().toLocaleString('ko-KR',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) };
+    state.bestTimes = [...state.bestTimes, rec].sort((a,b)=>a.time-b.time).slice(0,3);
+    try { localStorage.setItem('flagShisenBest', JSON.stringify(state.bestTimes)); } catch(e){}
+  }
+
+  function loadBestTimes() {
+    try { const s=localStorage.getItem('flagShisenBest'); if(s) state.bestTimes=JSON.parse(s); } catch(e){}
+  }
+
+  function handleTileClick(idx) {
+    if(state.matched.has(idx)||!state.isPlaying||state.gameWon||state.exploding.size>0) return;
+    state.hintPair = null;
+
+    if(state.selected===null) {
+      setState({selected:idx});
+    } else if(state.selected===idx) {
+      setState({selected:null});
+    } else {
+      state.moves++;
+      const path = state.board[state.selected].code===state.board[idx].code ? findPathWith(state.selected,idx,state.matched) : null;
+      if(path) {
+        playClap();
+        const sel = state.selected;
+        state.animatingPath = path;
+        state.exploding = new Set([sel,idx]);
+        render();
+        setTimeout(() => {
+          const nm = new Set(state.matched); nm.add(sel); nm.add(idx);
+          state.matched = nm;
+          state.score += 100;
+          state.selected = null;
+          state.animatingPath = null;
+          state.exploding = new Set();
+          if(nm.size === state.board.length) {
+            state.gameWon = true;
+            state.isPlaying = false;
+            clearInterval(timerInterval);
+            saveBestTime(state.time, state.moves, state.score);
+          }
+          render();
+        }, 700);
+      } else {
+        setState({selected:idx});
+      }
+    }
+  }
+
+  function showHint() {
+    if(state.hintsRemaining<=0||!state.isPlaying||state.gameWon) return;
+    for(let i=0;i<state.board.length;i++) {
+      if(state.matched.has(i)) continue;
+      for(let j=i+1;j<state.board.length;j++) {
+        if(state.matched.has(j)) continue;
+        if(state.board[i].code===state.board[j].code && findPathWith(i,j,state.matched)) {
+          state.hintsRemaining--;
+          state.hintPair = [i,j];
+          render();
+          setTimeout(()=>{ state.hintPair=null; render(); }, 3000);
+          return;
+        }
+      }
+    }
+    alert('매칭 가능한 쌍이 없습니다! 섞기를 사용하세요.');
+  }
+
+  function doShuffle() {
+    if(state.shufflesRemaining<=0||!state.isPlaying||state.gameWon) return;
+    let attempts=0;
+    while(attempts<100) {
+      const shuffled = [...state.board];
+      const ui = [];
+      for(let i=0;i<shuffled.length;i++) if(!state.matched.has(i)) ui.push(i);
+      for(let i=ui.length-1;i>0;i--) { const j=Math.floor(Math.random()*(i+1)); [shuffled[ui[i]],shuffled[ui[j]]]=[shuffled[ui[j]],shuffled[ui[i]]]; }
+      if(hasValidMoves(shuffled,state.matched)) { state.board=shuffled; break; }
+      attempts++;
+    }
+    state.shufflesRemaining--;
+    state.selected=null;
+    state.hintPair=null;
+    render();
+  }
+
+  // ===== Render =====
+  function render() {
+    const s = state;
+    const root = document.getElementById('app');
+
+    let html = '<div class="container">';
+
+    // 최고 기록
+    if(s.bestTimes.length>0) {
+      html += '<div class="records"><h2>🏆 최고 기록 TOP 3</h2>';
+      s.bestTimes.forEach((r,i) => {
+        const medal = i===0?'🥇':i===1?'🥈':'🥉';
+        html += `<div class="record-row"><div style="display:flex;align-items:center;gap:6px"><span>${medal}</span><span class="date">${r.date}</span></div><div><span class="time-val">${Math.floor(r.time/60)}분 ${r.time%60}초</span><span class="moves-val">${r.moves}회</span></div></div>`;
+      });
+      html += '</div>';
+    }
+
+    // 헤더
+    html += `<div class="header">
+      <div class="title">🌍 국기 사천성</div>
+      <div class="stats">
+        <div class="stat stat-score"><div class="stat-label">점수</div><div class="stat-value">${s.score}</div></div>
+        <div class="stat stat-moves"><div class="stat-label">이동</div><div class="stat-value">${s.moves}</div></div>
+        <div class="stat stat-time"><div class="stat-label">⏱ 시간</div><div class="stat-value" id="timer-display">${formatTime(s.time)}</div></div>
+      </div>
+    </div>`;
+
+    // 게임판
+    html += '<div class="board-wrap"><div class="board">';
+    s.board.forEach((tile, idx) => {
+      const isMatched = s.matched.has(idx);
+      const isSelected = s.selected===idx;
+      const isHinted = s.hintPair && s.hintPair.includes(idx);
+      const isExploding = s.exploding.has(idx);
+      let cls = 'tile';
+      if(isMatched) cls += ' matched';
+      if(isSelected) cls += ' selected';
+      if(isHinted) cls += ' hinted';
+      if(isExploding) cls += ' exploding';
+      html += `<button class="${cls}" data-idx="${idx}">${isMatched?'':'<span>'+tile.emoji+'</span>'}</button>`;
+    });
+    html += '</div>';
+
+    // SVG 경로
+    if(s.animatingPath) {
+      html += `<svg class="path-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
+        <defs><linearGradient id="lg" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#fbbf24"/><stop offset="50%" stop-color="#f59e0b"/><stop offset="100%" stop-color="#fbbf24"/>
+        </linearGradient></defs>`;
+      const cw=100/COLS, ch=100/ROWS;
+      const gc = (v,mx,cs) => v<0?-5:v>=mx?105:(v+0.5)*cs;
+      for(let i=0;i<s.animatingPath.length-1;i++) {
+        const p=s.animatingPath[i], n=s.animatingPath[i+1];
+        html += `<line x1="${gc(p.col,COLS,cw)}" y1="${gc(p.row,ROWS,ch)}" x2="${gc(n.col,COLS,cw)}" y2="${gc(n.row,ROWS,ch)}"
+          stroke="url(#lg)" stroke-width="0.8" stroke-linecap="round" stroke-dasharray="100" stroke-dashoffset="100"
+          vector-effect="non-scaling-stroke" style="filter:drop-shadow(0 0 4px rgba(251,191,36,0.9));animation:drawLine 0.4s ease-out forwards"/>`;
+      }
+      html += '</svg>';
+    }
+    html += '</div>';
+
+    // 버튼
+    html += `<div class="buttons">
+      <button class="btn btn-new" id="btn-new">🔄 새 게임</button>
+      <button class="btn btn-shuffle" id="btn-shuffle" ${s.shufflesRemaining<=0||!s.isPlaying||s.gameWon?'disabled':''}>🔀 섞기 (${s.shufflesRemaining})</button>
+      <button class="btn btn-hint" id="btn-hint" ${s.hintsRemaining<=0||!s.isPlaying||s.gameWon?'disabled':''}>💡 힌트 (${s.hintsRemaining})</button>
+    </div>`;
+
+    // 승리 모달
+    if(s.gameWon) {
+      const isRecord = s.bestTimes.length>0 && s.bestTimes[0].time===s.time;
+      html += `<div class="overlay" id="win-overlay">
+        <div class="modal">
+          <div style="font-size:48px;margin-bottom:12px">🏆</div>
+          <h2>축하합니다! 🎉</h2>
+          ${isRecord?'<div class="new-record">🏆 신기록 달성! 🏆</div>':''}
+          <div class="final-info">${s.moves}번의 이동으로 ${formatTime(s.time)}에 완료!</div>
+          <div class="final-score">점수: ${s.score}점</div>
+          <button class="btn btn-new" id="btn-replay" style="width:auto;padding:12px 32px;font-size:15px;display:inline-flex">다시 하기</button>
+        </div>
+      </div>`;
+    }
+
+    // 게임 설명
+    html += `<div class="info">
+      <h3>게임 방법</h3>
+      <div>
+        <div>• 같은 국기 2개를 선택하여 매칭하세요</div>
+        <div>• 경로는 최대 2번까지 꺾을 수 있습니다</div>
+        <div>• 게임판 외곽을 통해서도 연결 가능합니다</div>
+        <div>• 💡 힌트로 매칭 가능한 쌍을 확인 (2회)</div>
+        <div>• 🔀 섞기는 게임당 1회만 사용 가능</div>
+        <div>• 모든 타일을 제거하면 승리!</div>
+      </div>
+    </div>`;
+
+    html += '</div>';
+    root.innerHTML = html;
+
+    // Attach events
+    document.querySelectorAll('.tile:not(.matched)').forEach(btn => {
+      btn.addEventListener('click', () => handleTileClick(parseInt(btn.dataset.idx)));
+    });
+    const btnNew = document.getElementById('btn-new');
+    if(btnNew) btnNew.addEventListener('click', initializeGame);
+    const btnShuffle = document.getElementById('btn-shuffle');
+    if(btnShuffle) btnShuffle.addEventListener('click', doShuffle);
+    const btnHint = document.getElementById('btn-hint');
+    if(btnHint) btnHint.addEventListener('click', showHint);
+    const btnReplay = document.getElementById('btn-replay');
+    if(btnReplay) btnReplay.addEventListener('click', initializeGame);
+  }
+
+  // Init
+  loadBestTimes();
+  initializeGame();
+})();
+</script>
+</body>
+</html>
